@@ -1,0 +1,48 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Confirmar e-mail · Rota Segura Kids</title>
+<style>body{margin:0;background:#f3f6f7;color:#082746;font:18px system-ui;display:grid;min-height:100vh;place-items:center}main{background:white;border-radius:24px;box-shadow:0 12px 50px #08274615;padding:36px;max-width:520px;margin:24px;text-align:center}img{width:190px;max-width:70%}h1{font-size:28px}p{line-height:1.6}button{padding:14px 24px;border:0;border-radius:12px;background:#ffbd12;color:#082746;font:inherit;cursor:pointer}button:disabled{opacity:.5}</style></head>
+<body><main><img src="logo.png" alt="Rota Segura Kids"><h1 id="title">Confirmar e-mail</h1><p id="message" role="status">Aguarde enquanto verificamos seu link.</p><button id="retry" hidden>Tentar novamente</button></main>
+<script src="config.js"></script><script>
+// O token chega no fragmento, não é enviado à hospedagem e não é salvo no navegador.
+const params = new URLSearchParams(location.hash.slice(1));
+const tokenHash = params.get('token_hash');
+const callbackType = params.get('type');
+const callbackToken = params.get('access_token');
+history.replaceState(null, '', location.pathname);
+const title = document.getElementById('title'), message = document.getElementById('message'), retry = document.getElementById('retry');
+async function confirmEmail() {
+  retry.hidden = true;
+  // O fluxo padrão do Supabase já valida o link antes de redirecionar para esta página.
+  if (callbackType === 'signup' && callbackToken) {
+    title.textContent = 'E-mail confirmado!';
+    message.textContent = 'Seu cadastro foi confirmado. Volte ao Rota Segura Kids e entre com seu e-mail e senha.';
+    return;
+  }
+  if (params.has('error') || params.has('error_code')) {
+    title.textContent = 'Não foi possível confirmar';
+    message.textContent = 'O link pode estar vencido ou já ter sido utilizado. Solicite um novo e-mail no aplicativo.';
+    return;
+  }
+  if (!tokenHash) { message.textContent = 'Abra o link de confirmação recebido no seu e-mail. Se você já confirmou, volte ao aplicativo para entrar.'; return; }
+  try {
+    const response = await fetch(window.RSK_AUTH.url + '/auth/v1/verify', {
+      method: 'POST', headers: {'Content-Type': 'application/json', 'apikey': window.RSK_AUTH.key},
+      body: JSON.stringify({token_hash: tokenHash, type: 'email'})
+    });
+    const result = await response.json();
+    if (!response.ok || !result.user?.email_confirmed_at) {
+      title.textContent = 'Não foi possível confirmar';
+      message.textContent = 'O link pode estar vencido ou já ter sido utilizado. Se já confirmou, volte ao aplicativo e toque em “Já ativei pelo link do e-mail”. Caso contrário, solicite um novo e-mail no aplicativo.';
+      return;
+    }
+    // A sessão retornada não é persistida: esta página apenas confirma o e-mail.
+    title.textContent = 'E-mail confirmado!';
+    message.textContent = 'Volte ao Rota Segura Kids e toque em “Já ativei pelo link do e-mail” para entrar.';
+  } catch (_) {
+    title.textContent = 'Falha de conexão';
+    message.textContent = 'Não conseguimos verificar a confirmação. Confira sua conexão e tente novamente.';
+    retry.hidden = false;
+  }
+}
+retry.onclick = confirmEmail;
+confirmEmail();
+</script></body></html>
