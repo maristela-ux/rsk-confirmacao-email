@@ -9,12 +9,31 @@ const callbackType = params.get('type');
 const callbackToken = params.get('access_token');
 history.replaceState(null, '', location.pathname);
 const title = document.getElementById('title'), message = document.getElementById('message'), retry = document.getElementById('retry');
+function showWelcome(user) {
+  const name = user?.user_metadata?.full_name?.trim();
+  const role = user?.user_metadata?.role;
+  title.textContent = 'E-mail confirmado!';
+  if (role === 'guardian') {
+    message.textContent = `Seu e-mail foi confirmado${name ? `, ${name}` : ''}! Boas-vindas ao Rota Segura Kids. Sua conta de responsável está pronta. Volte ao aplicativo para entrar.`;
+  } else if (role === 'driver') {
+    message.textContent = `Seu e-mail foi confirmado${name ? `, ${name}` : ''}! Boas-vindas ao Rota Segura Kids. Seu cadastro de motorista foi iniciado. Volte ao aplicativo para continuar.`;
+  } else {
+    message.textContent = `Seu e-mail foi confirmado${name ? `, ${name}` : ''}! Boas-vindas ao Rota Segura Kids. Volte ao aplicativo para entrar.`;
+  }
+}
 async function confirmEmail() {
   retry.hidden = true;
   // O fluxo padrão do Supabase já valida o link antes de redirecionar para esta página.
   if (callbackType === 'signup' && callbackToken) {
-    title.textContent = 'E-mail confirmado!';
-    message.textContent = 'Seu cadastro foi confirmado. Volte ao Rota Segura Kids e entre com seu e-mail e senha.';
+    try {
+      const response = await fetch(window.RSK_AUTH.url + '/auth/v1/user', {
+        headers: {'apikey': window.RSK_AUTH.key, 'Authorization': `Bearer ${callbackToken}`}
+      });
+      const result = response.ok ? await response.json() : null;
+      showWelcome(result);
+    } catch (_) {
+      showWelcome(null);
+    }
     return;
   }
   if (params.has('error') || params.has('error_code')) {
@@ -35,8 +54,7 @@ async function confirmEmail() {
       return;
     }
     // A sessão retornada não é persistida: esta página apenas confirma o e-mail.
-    title.textContent = 'E-mail confirmado!';
-    message.textContent = 'Volte ao Rota Segura Kids e toque em “Já ativei pelo link do e-mail” para entrar.';
+    showWelcome(result.user);
   } catch (_) {
     title.textContent = 'Falha de conexão';
     message.textContent = 'Não conseguimos verificar a confirmação. Confira sua conexão e tente novamente.';
